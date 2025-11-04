@@ -1,0 +1,2592 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content Generator Pro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Ensure action-group buttons are always horizontal and spaced */
+    .action-group {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      justify-content: flex-start;
+      align-items: center;
+      flex-wrap: nowrap; /* keep buttons on the same row */
+    }
+    .url-cell {
+      font-size: 13px;
+      color: var(--primary);
+      background: rgba(6,182,212,0.08);
+      border-radius: 8px;
+      padding: 6px 12px;
+      display: inline-block;
+      word-break: break-all;
+      max-width: 180px;
+    }
+    #threejs-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      opacity: 0.7;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      will-change: transform;
+      transition: transform 0.12s linear;
+    }
+    /* 🌈 Reset and base styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      /* Updated palette: teal / cyan instead of purple */
+      --primary: #06b6d4; /* teal */
+      --primary-light: #7dd3fc; /* light cyan */
+      --primary-dark: #0b7285; /* darker teal */
+      --secondary: #10b981; /* success green (unchanged) */
+        --accent: #06b6d4; /* teal accent */
+      --gradient-1: #06b6d4;
+      --gradient-2: #0ea5e9;
+      --gradient-3: #7dd3fc;
+      --background: #071428;
+      --surface: #0f1724;
+      --surface-light: #0f2a3a;
+      --text: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --success: #059669;
+      --border: rgba(148, 163, 184, 0.1);
+      --card-bg: rgba(6, 18, 28, 0.75);
+      --hover-bg: rgba(6, 182, 212, 0.08);
+      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    @property --gradient-angle {
+      syntax: "<angle>";
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      position: relative;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        linear-gradient(45deg, var(--background) 0%, transparent 100%),
+          radial-gradient(circle at center, rgba(6,182,212,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+      animation: backgroundShimmer 10s ease-in-out infinite alternate;
+    }
+
+    @keyframes backgroundShimmer {
+      0% {
+        opacity: 0.5;
+        transform: scale(1);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1.1);
+      }
+    }
+
+    /* Cursor-follow spotlight and layered glow for a richer background */
+    :root {
+      --mx: 50%;
+      --my: 50%;
+    }
+
+  body::after {
+      /* two soft radial glows that follow the cursor */
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(6,182,212,0.12) 0%, transparent 18%),
+      radial-gradient(circle at calc(var(--mx) + 8%) calc(var(--my) + 6%), rgba(14,165,233,0.06) 0%, transparent 12%);
+      mix-blend-mode: screen;
+      transition: background-position 0.12s linear, opacity 0.2s ease;
+      opacity: 0.95;
+      will-change: background-position, opacity;
+    }
+
+    /* Particle canvas styles + twinkle/vignette layers */
+    .particle-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1; /* sits above threejs (which we keep at -2) but behind UI */
+      mix-blend-mode: screen;
+      opacity: 0.9;
+      filter: blur(0);
+    }
+
+    /* small vignette to focus center */
+    .bg-vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+      background: radial-gradient(60% 50% at 50% 45%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.28) 70%);
+      mix-blend-mode: multiply;
+      opacity: 0.75;
+    }
+
+    /* twinkle animation for tiny stars (used by canvas but included for fallback visuals) */
+    @keyframes twinkle {
+      0% { opacity: 0.1; transform: scale(0.8); }
+      50% { opacity: 0.9; transform: scale(1.15); }
+      100% { opacity: 0.1; transform: scale(0.9); }
+    }
+
+    /* Respect reduced motion: disable particle canvas and heavy transitions */
+    @media (prefers-reduced-motion: reduce) {
+      .particle-canvas { display: none !important; }
+      body::after { transition: none !important; }
+      #threejs-container { transition: none !important; }
+    }
+
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+      50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.2; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 36px;
+      color: #ffffff;
+      text-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+      margin-bottom: 25px;
+      letter-spacing: 1px;
+      position: relative;
+      padding-bottom: 15px;
+    }
+
+    h1::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, #06b6d4, #0ea5e9);
+      border-radius: 3px;
+    }
+
+    .container {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      width: 100%;
+      max-width: 1000px;
+      border-radius: 24px;
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+      animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+  .container::before,
+  .container::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      z-index: -1;
+      background: conic-gradient(
+        from var(--gradient-angle),
+        var(--gradient-1),
+        var(--gradient-2),
+        var(--gradient-3),
+        var(--gradient-2),
+        var(--gradient-1)
+      );
+      border-radius: 26px;
+      animation: rotation 20s linear infinite;
+    }
+
+    .container::after {
+      filter: blur(50px);
+      opacity: 0.3;
+    }
+
+    @keyframes rotation {
+      0% { --gradient-angle: 0deg; }
+      100% { --gradient-angle: 360deg; }
+    }
+
+    .container-inner {
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 40px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.35),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      animation: containerGlow 6s ease-in-out infinite alternate;
+    }
+
+    @keyframes containerGlow {
+      0% {
+        box-shadow: 
+          0 25px 50px -12px rgba(0, 0, 0, 0.35),
+          0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+          0 0 30px rgba(6,182,212,0.08);
+      }
+      100% {
+        box-shadow: 
+          0 25px 50px -12px rgba(0, 0, 0, 0.35),
+          0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+          0 0 50px rgba(14,165,233,0.12);
+      }
+    }
+
+    .form-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .form-container::before {
+      content: '';
+      position: absolute;
+      top: -20px;
+      left: -20px;
+      right: -20px;
+      bottom: -20px;
+      background: radial-gradient(
+        circle at 50% 0%,
+        rgba(6, 182, 212, 0.08),
+        transparent 70%
+      );
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .container::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to right,
+        transparent,
+        rgba(59, 130, 246, 0.1),
+        transparent
+      );
+      transform: translateX(-100%);
+      animation: shimmer 3s infinite;
+    }
+
+    @keyframes shimmer {
+      100% {
+        transform: translateX(100%);
+      }
+    }
+
+    .header {
+      margin-bottom: 40px;
+      text-align: center;
+      position: relative;
+    }
+
+    .logo {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #06b6d4, #0ea5e9);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+      animation: titleGradient 4s ease infinite;
+    }
+
+    @keyframes titleGradient {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+      );
+      animation: shine 8s infinite;
+    }
+    
+
+    .input-group {
+  margin-bottom: 14px;
+  position: relative;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.95);
+  padding: 10px 8px;
+  backdrop-filter: blur(2px);
+  border: 2px solid rgba(6, 182, 212, 0.2);
+  transition: border-color 0.3s ease;
+  overflow: hidden;
+    }
+
+    .input-group:hover {
+      border-color: rgba(6, 182, 212, 0.5);
+    }
+
+    .input-group::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+      );
+    }
+
+    .input-group::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 16px;
+      padding: 1px;
+      background: linear-gradient(
+        135deg,
+        rgba(6, 182, 212, 0.18),
+        rgba(14, 165, 233, 0.12)
+      );
+      -webkit-mask: 
+        linear-gradient(#fff 0 0) content-box, 
+        linear-gradient(#fff 0 0);
+      mask: 
+        linear-gradient(#fff 0 0) content-box, 
+        linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .input-group:focus-within::before {
+      opacity: 1;
+    }
+
+    .input-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  position: relative;
+    }
+
+    label {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  position: relative;
+  padding-left: 8px;
+  border-left: 2px solid var(--primary);
+    }
+
+    .label-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--primary);
+  font-size: 13px;
+  position: relative;
+  overflow: hidden;
+    }
+
+    .label-icon::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .input-group:hover .label-icon::before {
+      opacity: 1;
+    }
+
+    .input-wrapper {
+      position: relative;
+      isolation: isolate;
+    }
+
+    textarea, input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(6, 182, 212, 0.10);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  transition: box-shadow 0.3s cubic-bezier(0.4,0,0.2,1), background 0.3s cubic-bezier(0.4,0,0.2,1);
+  resize: none;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+    }
+
+    textarea {
+  min-height: 150px;
+  padding: 8px 10px;
+    }
+
+    textarea:focus, input:focus {
+      outline: none;
+      background: rgba(15, 23, 42, 0.8);
+      border-color: var(--primary);
+      box-shadow: 
+        0 0 0 1px var(--primary),
+  0 0 30px rgba(6, 182, 212, 0.2),
+  0 0 0 4px rgba(6, 182, 212, 0.1);
+      transform: translateY(-1px);
+    }
+
+    textarea:focus::placeholder,
+    input:focus::placeholder {
+      opacity: 0.4;
+      transform: translateX(4px);
+    }
+
+    .input-wrapper::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      pointer-events: none;
+      background: linear-gradient(
+        135deg,
+        rgba(6, 182, 212, 0.08),
+        rgba(14, 165, 233, 0.06)
+      );
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .input-wrapper:focus-within::after {
+      opacity: 1;
+    }
+
+    .input-help {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      padding-left: 20px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-help::before {
+      content: '💡';
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    ::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.4;
+      transition: all 0.3s ease;
+    }
+
+    .url-preview {
+      margin-top: 16px;
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.3);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .url-parts {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .url-part {
+      flex: 1;
+      padding: 12px 16px;
+      background: rgba(30, 41, 59, 0.4);
+      border-radius: 10px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .url-copy-btn {
+      background: rgba(6, 182, 212, 0.08);
+      color: var(--primary);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .url-copy-btn:hover {
+      background: var(--primary);
+      color: white;
+      transform: translateY(-1px);
+    }
+
+    button.generate-btn {
+      background: linear-gradient(135deg, #06b6d4, #0ea5e9);
+      color: white;
+      border: none;
+      padding: 16px 40px;
+      border-radius: 16px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 20px 0;
+      transform-style: preserve-3d;
+      transform: perspective(1000px) translateZ(0);
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        0 8px 20px rgba(0, 0, 0, 0.3),
+        0 20px 40px -20px var(--gradient-1);
+    }
+
+    .generate-btn::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      background: linear-gradient(90deg, var(--gradient-1), var(--gradient-2), var(--gradient-3));
+      border-radius: 18px;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .generate-btn:hover {
+      transform: perspective(1000px) translateZ(20px);
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        0 12px 30px rgba(0, 0, 0, 0.4),
+        0 30px 60px -20px var(--gradient-1);
+    }
+
+    .generate-btn:hover::before {
+      opacity: 1;
+    }
+
+    .generate-btn i {
+      font-size: 24px;
+      transition: transform 0.4s ease;
+    }
+
+    .generate-btn:hover i {
+      transform: scale(1.2) rotate(180deg);
+    }
+
+    .generate-btn.loading {
+      background: linear-gradient(135deg, var(--gradient-2), var(--gradient-3));
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    .form-section {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Make the form section wider and more roomy on larger screens */
+    .form-section {
+      max-width: 980px; /* wider form area */
+      width: 100%;
+      margin: 0 auto 20px;
+      padding: 20px 24px;
+      box-sizing: border-box;
+      background: rgba(15, 23, 42, 0.06);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.02);
+    }
+
+    .form-section::before {
+      content: '';
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, var(--gradient-1) 0%, transparent 70%);
+      top: 50%;
+      left: -100px;
+      transform: translateY(-50%);
+      opacity: 0.1;
+      filter: blur(40px);
+      pointer-events: none;
+      animation: formGlow 4s ease-in-out infinite alternate;
+    }
+
+    .form-section::after {
+      content: '';
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, var(--gradient-3) 0%, transparent 70%);
+      top: 50%;
+      right: -100px;
+      transform: translateY(-50%);
+      opacity: 0.1;
+      filter: blur(40px);
+      pointer-events: none;
+      animation: formGlow 4s ease-in-out infinite alternate-reverse;
+    }
+
+    @keyframes formGlow {
+      0% { opacity: 0.05; transform: translateY(-50%) scale(0.9); }
+      100% { opacity: 0.15; transform: translateY(-50%) scale(1.1); }
+    }
+
+    .generate-btn.loading i {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    button i {
+      font-size: 18px;
+    }
+
+    @keyframes buttonGlow {
+      0%, 100% { 
+        box-shadow: 
+          0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+          0 10px 30px -10px rgba(59, 130, 246, 0.5);
+      }
+      50% { 
+        box-shadow: 
+          0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+          0 10px 40px -5px rgba(59, 130, 246, 0.7);
+      }
+    }
+
+    button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.4), rgba(255,255,255,0));
+      transform: translateX(-100%) rotate(45deg);
+      transition: transform 0.6s ease;
+    }
+
+    button::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 5px 15px rgba(6, 182, 212, 0.28);
+      animation: none;
+    }
+
+    button:hover::before {
+      transform: translateX(100%) rotate(45deg);
+    }
+
+    button:hover::after {
+      opacity: 1;
+      animation: ripple 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    button:active {
+      transform: translateY(1px) scale(0.98);
+    }
+
+    @keyframes ripple {
+      0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
+      100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+    }
+
+    .result-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-top: 40px;
+      font-size: 14px;
+    }
+
+    /* Adjust table styles for better layout */
+    table {
+      table-layout: auto;
+      width: 100%;
+      max-width: 100%;
+      border-collapse: collapse;
+      margin: 0 auto;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 20px 0;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    th, td {
+      font-size: 12px; /* Reduce font size for better fit */
+      padding: 8px; /* Adjust padding for compact layout */
+      text-align: left;
+      border: 1px solid var(--border);
+      word-wrap: break-word;
+    }
+
+    th {
+      background: linear-gradient(135deg, #06b6d4, #0ea5e9);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 12px;
+      text-align: left;
+    }
+
+    td {
+      font-size: 13px;
+      color: #e2e8f0;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: rgba(6, 182, 212, 0.06);
+    }
+
+    .result-table {
+      /* Prevent horizontal scrolling: allow content to wrap and fit the container */
+      overflow-x: hidden;
+      border-radius: 12px;
+    }
+    /* Full-lined table style: collapse borders for clear grid lines */
+    .result-table { background: transparent; padding: 0; }
+    table { border-collapse: collapse; border-spacing: 0; width: 100%; }
+    thead th {
+  background: linear-gradient(90deg, rgba(6,182,212,0.95), rgba(14,165,233,0.95));
+      color: #fff;
+      padding: 10px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    tbody td {
+      background: rgba(15, 23, 42, 0.35);
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text);
+    }
+    tbody tr { background: transparent; }
+    /* Slight emphasis for target cell */
+    td.target-cell { font-weight: 700; color: var(--primary-light); }
+    /* Action button tweaks (no heavy shadows) */
+    .btn-small {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: none;
+      font-size: 10px !important;
+    }
+  .btn-small:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(2,6,23,0.4); background: rgba(6,182,212,0.08); color: white; }
+    /* Status badge kept but simpler */
+  .status-badge { padding: 6px 12px; border-radius: 999px; background: rgba(6,182,212,0.04); color: var(--primary-light); font-weight:700; }
+    .status-badge.completed { background: rgba(16,185,129,0.08); color: var(--secondary); }
+
+    .loading-animation {
+      display: none; /* Hide loading animation when results are available */
+    }
+
+    @keyframes tableAppear {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    th {
+      background: rgba(30, 41, 59, 0.95);
+      color: var(--text);
+      font-weight: 600;
+      padding: 20px;
+      text-align: left;
+      position: relative;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid var(--border);
+    }
+
+    th::before {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    th:hover::before {
+      transform: scaleX(1);
+    }
+
+    th::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+  background: linear-gradient(90deg, rgba(6,182,212,0.18), rgba(6,182,212,0.12));
+    }
+
+    td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+      transition: all 0.3s ease;
+      word-wrap: break-word;
+      text-align: left;
+    }
+
+    tr {
+      transition: all 0.3s ease;
+      animation: tableRowFadeIn 0.6s ease-out;
+      animation-fill-mode: both;
+      background: transparent;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--primary);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-badge::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      animation: rotateGradient 3s linear infinite;
+    }
+
+    @keyframes rotateGradient {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .status-badge.completed {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--secondary);
+      border-color: rgba(16, 185, 129, 0.3);
+      animation: completedPulse 2s infinite;
+    }
+
+    @keyframes completedPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+      100% { transform: scale(1); }
+    }
+
+    .status-badge.completed {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--secondary);
+      border-color: rgba(16, 185, 129, 0.2);
+    }
+
+    @keyframes tableRowFadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    tr {
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    tr:hover {
+      background: rgba(30, 41, 59, 0.4);
+      transform: translateY(-2px) scale(1.01);
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+      z-index: 1;
+    }
+
+    tr::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(6, 182, 212, 0.1),
+        transparent
+      );
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    tr:hover::before {
+      opacity: 1;
+      animation: rowShimmer 2s infinite;
+    }
+
+    @keyframes rowShimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    tr:hover td::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 2px;
+  background: linear-gradient(90deg, #06b6d4, #0ea5e9);
+      transform: scaleX(0);
+      animation: slideIn 0.3s ease-out forwards;
+    }
+
+    @keyframes slideIn {
+      to {
+        transform: scaleX(1);
+      }
+    }
+
+    .btn-small {
+      padding: 10px 20px;
+      font-size: 10px !important;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin: 2px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(30, 41, 59, 0.6);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(4px);
+      white-space: nowrap; /* prevent internal wrapping so buttons stay compact */
+    }
+
+    .btn-small::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        45deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+      );
+      transform: translateX(-100%);
+      transition: transform 0.6s ease;
+    }
+
+    .copy {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--secondary);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .copy:hover {
+      background: var(--secondary);
+      color: white;
+      border-color: var(--secondary);
+      transform: translateY(-2px);
+      box-shadow: 
+        0 4px 12px rgba(16, 185, 129, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    }
+
+    .copy::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .copy:hover::before {
+      opacity: 1;
+      animation: rippleCopy 1s cubic-bezier(0, 0, 0.2, 1);
+    }
+
+    .copy.copied {
+      background: var(--secondary);
+      color: white;
+      animation: successPulse 0.5s ease;
+    }
+
+    @keyframes rippleCopy {
+      from {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0.5;
+      }
+      to {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0;
+      }
+    }
+
+    @keyframes successPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .action-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+
+    .btn-small::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0));
+      transform: translateX(-100%) rotate(45deg);
+      transition: transform 0.6s ease;
+    }
+
+    .copy:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
+    }
+
+    .copy:hover::before {
+      transform: translateX(100%) rotate(45deg);
+    }
+
+    .copy:active {
+      transform: translateY(1px);
+    }
+
+    .result {
+      margin-top: 20px;
+    }
+
+    /* 🔄 Loading style */
+    .loading {
+      text-align: center;
+      color: #6b7280;
+      font-size: 15px;
+      padding: 20px 0;
+    }
+
+    /* 🎞️ Hiệu ứng xuất hiện */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* 📱 Responsive */
+    @media (max-width: 768px) {
+      .container {
+        padding: 25px;
+      }
+      table {
+        font-size: 13px;
+      }
+      th, td {
+        padding: 8px;
+      }
+      /* On small screens keep form full width and remove extra padding */
+      .form-section {
+        padding: 12px;
+        margin: 0 0 16px;
+        max-width: 100%;
+        border-radius: 8px;
+      }
+    }
+
+    .copy-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: rgba(16, 185, 129, 0.95);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      animation: fadeInOut 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      z-index: 1000;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 
+        0 10px 30px -5px rgba(16, 185, 129, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .copy-toast i {
+      font-size: 18px;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+      20% { opacity: 1; transform: translateY(0) scale(1); }
+      80% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-20px) scale(0.9); }
+    }
+
+    /* Add 3D mouse movement effect to the container */
+    .container {
+      transition: transform 0.3s ease;
+    }
+
+    /* Restrict container width so table can layout nicely on wide screens */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+
+    /* Floating animation for logo */
+    @keyframes floatLogo {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    /* Fix table layout issues */
+    table {
+      table-layout: auto;
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      word-wrap: break-word;
+      text-align: left;
+      padding: 12px;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: rgba(30, 41, 59, 0.95);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    td {
+      background: rgba(15, 23, 42, 0.4);
+      color: var(--text-secondary);
+    }
+
+    /* Make action buttons compact and table more readable */
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 10px;
+    }
+
+    .result-table td button {
+      display: inline-block;
+      /* don't force the button to expand the column; let it size to content */
+      width: auto;
+      max-width: 160px;
+      box-sizing: border-box;
+      white-space: normal; /* allow wrapping if needed */
+      text-overflow: ellipsis;
+      overflow: hidden;
+      word-break: break-word;
+    }
+
+    /* Keep the keyword column left-aligned */
+    .result-table td:nth-child(2) {
+      text-align: left;
+      padding-left: 10px;
+    }
+
+    /* Center small columns like STT and Complete */
+    .result-table td:nth-child(1),
+    .result-table td:nth-child(8) {
+      text-align: center;
+    }
+
+    /* Target cell styling */
+    .target-cell {
+      color: var(--primary-light);
+      font-weight: 600;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    tbody tr:hover {
+      background: rgba(59, 130, 246, 0.1);
+    }
+  /* User requested smaller table and font sizes — tweak to help avoid horizontal scroll */
+  .result-table { font-size: 11px; }
+  .result-table th, .result-table td { padding: 8px; font-size: 9px; }
+  .btn-small { padding: 6px 10px; font-size: 13px; }
+    .form-section, .input-group, textarea, input { font-size: 12px; }
+    /* Container-local canvas for subtle UI motion and orbs */
+    .container-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2; /* above container-inner background but below UI elements */
+      mix-blend-mode: screen;
+      opacity: 0.9;
+      border-radius: 20px;
+      will-change: transform, opacity;
+    }
+    .header-orbit {
+      position: absolute;
+      width: 220px;
+      height: 220px;
+      left: 50%;
+      top: -80px;
+      transform: translateX(-50%);
+      pointer-events: none;
+      opacity: 0.06;
+      z-index: 1;
+  background: radial-gradient(circle, rgba(6,182,212,0.22) 0%, rgba(14,165,233,0.06) 40%, transparent 70%);
+      filter: blur(30px);
+      border-radius: 50%;
+      animation: headerFloat 8s ease-in-out infinite;
+    }
+    @keyframes headerFloat { 0% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-6px) } 100% { transform: translateX(-50%) translateY(0); } }
+  </style>
+</head>
+<body>
+  <div id="threejs-container"></div>
+  <!-- Canvas for lightweight particle layer (interactive but cheap) -->
+  <canvas id="bg-particles" class="particle-canvas" aria-hidden="true"></canvas>
+  <div class="container">
+    <div class="container-inner">
+      <!-- decorative soft orbit behind header -->
+      <div class="header-orbit" aria-hidden="true"></div>
+      <!-- canvas for container-local subtle particles / orbs -->
+      <canvas id="container-canvas" class="container-canvas" aria-hidden="true"></canvas>
+      <div class="header">
+       
+        <h1 class="title">Content Generator Pro</h1>
+        <p class="subtitle">Generate optimized content efficiently with our advanced tools</p>
+      </div>
+      <div class="form-container">
+
+    <div class="form-section">
+      <div class="input-group keywords-group">
+        <div class="input-label">
+          <span class="label-icon">🎯</span>
+          <label for="keywords">Từ khóa gốc</label>
+        </div>
+        <div class="input-wrapper">
+          <input 
+            id="keywords" 
+            type="text" 
+            placeholder="Nhập 1 từ khóa gốc (ví dụ: pg电子)"
+          >
+        </div>
+        <div class="input-help">
+          Chỉ nhập 1 từ khóa gốc. Hệ thống sẽ tự sinh N từ khóa chính chất lượng cao.
+        </div>
+      </div>
+
+      <div class="input-group url-group">
+        <div class="input-label">
+          <span class="label-icon">🔗</span>
+          <label for="url">URL đích</label>
+        </div>
+        <div class="input-wrapper">
+          <input 
+            id="url" 
+            type="text" 
+            placeholder="Nhập URL đích (ví dụ: http://191.run)" 
+            value="http://191.run"
+          >
+        </div>
+        <div class="input-help">
+          URL này sẽ được dùng trong bài viết SEO.
+        </div>
+      </div>
+
+      <div class="input-group num-articles-group">
+        <div class="input-label">
+          <span class="label-icon">#️⃣</span>
+          <label for="numArticles">Số lượng từ khóa chính chất lượng cao</label>
+        </div>
+        <div class="input-wrapper">
+          <input 
+            id="numArticles" 
+            type="number" 
+            min="1" max="50" value="3"
+            placeholder="Nhập số lượng (1-50)"
+          >
+        </div>
+        <div class="input-help">
+          Chọn số lượng từ khóa chính chất lượng cao cần sinh (tối đa 50).
+        </div>
+      </div>
+
+      <button class="generate-btn" onclick="generateContent()">
+        <i>✨</i>
+        Tạo nội dung SEO
+      </button>
+    </div>
+
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    const SITE_BASE = 'https://sites.google.com/view/';
+    let currentSiteId = '';
+    
+    function generateRandomId(length = 10) {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+    
+    function generateNewSiteId() {
+      currentSiteId = generateRandomId(10);
+      document.getElementById('siteIdDisplay').textContent = currentSiteId;
+      document.getElementById('siteUrlDisplay').textContent = SITE_BASE + currentSiteId;
+      document.getElementById('currentSiteId').textContent = `当前 ID: ${currentSiteId}`;
+      document.getElementById('siteIdCopyArea').style.display = 'block';
+    }
+    
+    // copy the 10-char site id for a specific row
+    function copySiteId(index) {
+      const item = (window.generatedData && window.generatedData[index]) || {};
+      const id = item.site_id || generateRandomId(10);
+      copyText(id).then(() => markCopied(index, 'id'));
+    }
+
+    // copy the full Google Sites URL for a specific row
+    function copySiteUrl(index) {
+      const item = (window.generatedData && window.generatedData[index]) || {};
+      const url = SITE_BASE + (item.site_id || generateRandomId(10));
+      copyText(url).then(() => markCopied(index, 'siteurl'));
+    }
+
+    async function generateContent() {
+      const generateBtn = document.querySelector('.generate-btn');
+      const rawKeyword = document.getElementById("keywords").value.trim();
+      const url = document.getElementById("url").value.trim() || "http://191.run";
+      const numArticlesInput = document.getElementById('numArticles');
+      const numArticles = parseInt(numArticlesInput?.value || '1', 10) || 1;
+      const resultDiv = document.getElementById("result");
+
+      // Only allow one root keyword (one line)
+      if (!rawKeyword) {
+        showToast("⚠️ Vui lòng nhập từ khóa gốc (chỉ 1 dòng)");
+        return;
+      }
+      if (rawKeyword.includes('\n')) {
+        showToast("⚠️ Chỉ nhập đúng 1 từ khóa gốc (1 dòng)");
+        return;
+      }
+      if (isNaN(numArticles) || numArticles < 1 || numArticles > 50) {
+        showToast('⚠️ Số lượng từ khóa chính chất lượng cao phải từ 1 đến 50');
+        return;
+      }
+
+      // Update button state
+      generateBtn.classList.add('loading');
+      generateBtn.innerHTML = '<i>🔄</i> Đang tạo...';
+
+      resultDiv.innerHTML = `
+        <div class="loading-animation">
+          <div class="loader"></div>
+          <p>Đang sinh nội dung SEO, vui lòng đợi...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch("https://backend-create-content-googlesite-pyc.onrender.com/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ main_keyword: rawKeyword, url, num_articles: numArticles })
+        });
+
+        if (!response.ok) throw new Error("服务器返回错误：" + response.status);
+
+        const raw = await response.json();
+        // assign a unique 10-char site_id to each item
+        const data = (Array.isArray(raw) ? raw : []).map(item => ({ ...item, site_id: generateRandomId(10) }));
+        window.generatedData = data;
+        window.copyState = [];
+        window.providedUrl = url;
+        renderTable(data);
+      } catch (err) {
+        resultDiv.innerHTML = `<p style=\"color:red;\">❌ Lỗi tạo nội dung: ${err.message}</p>`;
+      } finally {
+        generateBtn.classList.remove('loading');
+        generateBtn.innerHTML = '<i>✨</i> Tạo nội dung SEO';
+      }
+    }
+
+    // Copy ID: get exactly the 10-char random site_id
+    function copyRandomId(index) {
+      const item = window.generatedData && window.generatedData[index];
+      if (item && typeof item.site_id === 'string' && item.site_id.length === 10) {
+        navigator.clipboard.writeText(item.site_id).then(() => {
+          showToast("✅ 10-char ID copied!");
+          markCopied(index, 'id');
+        }).catch(() => {
+          showToast("⚠️ Unable to copy ID");
+        });
+      } else {
+        showToast("⚠️ No valid 10-char ID to copy");
+      }
+    }
+
+// Copy Full URL: https://sites.google.com/view/ + 10-char random site_id
+function copyFullUrl(index) {
+  const item = window.generatedData && window.generatedData[index];
+  if (item && typeof item.site_id === 'string' && item.site_id.length === 10) {
+    const siteUrl = `https://sites.google.com/view/${item.site_id}`;
+    navigator.clipboard.writeText(siteUrl).then(() => {
+      showToast("✅ Google Site full URL copied!");
+      markCopied(index, 'siteurl');
+    }).catch(() => {
+      showToast("⚠️ Unable to copy full URL");
+    });
+  } else {
+    showToast("⚠️ No valid Google Site URL to copy");
+  }
+}
+
+// Function to copy full URL from the form (renamed to avoid collision with row-level copyFullUrl)
+function copyFormUrl() {
+  const url = document.getElementById("url").value.trim();
+  if (url) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast("✅ Full URL copied successfully");
+    });
+  } else {
+    showToast("⚠️ No URL to copy");
+  }
+}
+
+  // Function to copy URL without https:// or http://
+  function copyShortUrl() {
+    const url = document.getElementById("url").value.trim();
+    if (url) {
+      const shortUrl = url.replace(/^https?:\/\//, "");
+      navigator.clipboard.writeText(shortUrl).then(() => {
+        showToast("✅ Short URL copied successfully");
+      });
+    } else {
+      showToast("⚠️ No URL to copy");
+    }
+  }
+
+  // Function to copy content
+  function copyContent(index) {
+    const item = window.generatedData[index];
+    if (item && item.content) {
+      navigator.clipboard.writeText(item.content).then(() => {
+        showToast("✅ Content copied successfully");
+      });
+    } else {
+      showToast("⚠️ No content to copy");
+    }
+  }
+
+  // Fixing the copyDomain function to extract the domain from the Target URL input
+// Copy domain from Target URL input (and mark as copied for the given row)
+function copyDomain(index) {
+  const url = document.getElementById("url").value.trim();
+  if (url) {
+    const domain = url.replace(/^https?:\/\//, '').split('/')[0];
+    navigator.clipboard.writeText(domain).then(() => {
+      showToast("✅ Domain copied successfully");
+      if (typeof index !== 'undefined') markCopied(index, 'domain');
+    }).catch(() => {
+      showToast("⚠️ Unable to copy domain");
+    });
+  } else {
+    showToast("⚠️ No URL provided to extract domain");
+  }
+}
+
+// Copy all related keywords as a single <a> tag linking to Google Site (text and link)
+function copyRelatedKeywords(index) {
+  const item = window.generatedData && window.generatedData[index];
+  if (item && item.related && item.site_id) {
+    const siteUrl = `${SITE_BASE}${item.site_id}`;
+    const keywordsText = item.related.join(', ');
+    // HTML: clickable link with keywords as text
+  const htmlLink = `<a href='${siteUrl}' target='_blank' style='color:#06b6d4;text-decoration:underline;'>${keywordsText}</a>`;
+    // Copy both HTML and plain text
+    try {
+      const clipboardItem = new ClipboardItem({
+        'text/html': new Blob([htmlLink], { type: 'text/html' }),
+        'text/plain': new Blob([keywordsText], { type: 'text/plain' })
+      });
+      navigator.clipboard.write([clipboardItem]).then(() => {
+        showToast("✅ Keywords with Google Site link copied!");
+        markCopied(index, 'related');
+      }).catch(() => {
+        // fallback
+        navigator.clipboard.writeText(keywordsText).then(() => {
+          showToast("✅ Keywords copied!");
+          markCopied(index, 'related');
+        });
+      });
+    } catch (err) {
+      navigator.clipboard.writeText(keywordsText).then(() => {
+        showToast("✅ Keywords copied!");
+        markCopied(index, 'related');
+      });
+    }
+  } else {
+    showToast("⚠️ No related keywords to copy");
+  }
+}
+
+// Removing the copyFullDomainUrl function as requested
+// Removed the "Copy Full URL" button from the table rendering logic
+function renderTable(data) {
+  const resultDiv = document.getElementById("result");
+  const loadingAnimation = document.querySelector(".loading-animation");
+  if (data && data.length > 0 && loadingAnimation) {
+    loadingAnimation.style.display = "none";
+  }
+  let html = `<div class="result-table"><table><thead><tr>
+    <th>STT</th>
+    <th>Copy Title</th>
+    <th>Copy Content</th>
+    <th>Copy Keywords</th>
+    <th>Copy Domain</th>
+    <th>Copy Bing</th>
+    <th>Copy 10 ký tự</th>
+    <th>Copy Google Site</th>
+  </tr></thead><tbody>`;
+  data.forEach((item, idx) => {
+    if (item.error) {
+      html += `<tr><td colspan="8" style="color:red;">Lỗi ${idx + 1}: ${escapeHtml(item.error)}</td></tr>`;
+    } else {
+      html += `<tr data-index="${idx}">
+        <td>${idx + 1}</td>
+        <td><button class="btn-small copy" onclick="copyTitle(${idx})">Copy Title</button></td>
+        <td><button class="btn-small copy" onclick="copyContent(${idx})">Copy Content</button></td>
+        <td><button class="btn-small copy" onclick="copyKeywords(${idx})">Copy Keywords</button></td>
+        <td><button class="btn-small copy" onclick="copyDomain(${idx})">Copy Domain</button></td>
+        <td><button class="btn-small copy" onclick="copyBingUrl(${idx})">Copy Bing</button></td>
+        <td><button class="btn-small copy" onclick="copyRandomId(${idx})">Copy ID</button></td>
+        <td><button class="btn-small copy" onclick="copyGoogleSite(${idx})">Copy Google Site</button></td>
+      </tr>`;
+    }
+  });
+  html += "</tbody></table></div>";
+  resultDiv.innerHTML = html;
+}
+
+    // --- helper escaping used in templates ---
+// Copy STT (title)
+// Copy SEO content
+function copyContent(index) {
+  const item = window.generatedData && window.generatedData[index];
+  if (!item || !item.content) return showToast('⚠️ Không có nội dung');
+  navigator.clipboard.writeText(item.content).then(() => {
+    showToast('✅ Đã copy content!');
+    markCopied(index, 'content');
+  });
+}
+function copyTitle(index) {
+  const item = window.generatedData && window.generatedData[index];
+  if (!item) return showToast('⚠️ Không có dữ liệu');
+  const main = item.main_kw_quality || '';
+  const related = Array.isArray(item.related_keywords) ? item.related_keywords : [];
+  const siteId = item.site_id || '';
+  const googleSiteUrl = `https://sites.google.com/view/${siteId}`;
+  const text = [main, ...related].join(' - ');
+  copyHtmlContent(text, googleSiteUrl).then(() => markCopied(index, 'title'));
+}
+
+// Copy main keyword + 3 related keywords (keywords)
+function copyKeywords(index) {
+  const data = window.generatedData || [];
+  let htmlLines = [];
+  let textLines = [];
+  for (let i = 1; i <= 3; i++) {
+    const next = data[index + i];
+    if (!next) break;
+    const main = next.main_kw_quality || '';
+    const related = Array.isArray(next.related_keywords) ? next.related_keywords : [];
+    const siteId = next.site_id || '';
+    const googleSiteUrl = `https://sites.google.com/view/${siteId}`;
+    const text = [main, ...related].join(' - ');
+    htmlLines.push(`<a href='${googleSiteUrl}' target='_blank'>${text}</a>`);
+    textLines.push(text + '\n' + googleSiteUrl);
+  }
+  if (!htmlLines.length) return showToast('⚠️ Không có bài tiếp theo để copy');
+  const html = htmlLines.join('<br>');
+  const blob = new Blob([html], { type: 'text/html' });
+  const clipboardItem = new ClipboardItem({ 'text/html': blob, 'text/plain': textLines.join('\n\n') });
+  navigator.clipboard.write([clipboardItem]).then(() => {
+    showToast('✅ Đã copy keywords!');
+    markCopied(index, 'keywords');
+  });
+}
+
+// Copy domain (from input, remove http/https)
+function copyDomain(index) {
+  const url = window.providedUrl || document.getElementById('url').value.trim() || '';
+  if (!url) return showToast('⚠️ Không có URL');
+  const domain = url.replace(/^https?:\/\//, '').split('/')[0];
+  navigator.clipboard.writeText(domain).then(() => {
+    showToast('✅ Đã copy domain!');
+    markCopied(index, 'domain');
+  });
+}
+
+// Copy Bing search URL
+function copyBingUrl(index) {
+  const item = window.generatedData && window.generatedData[index];
+  if (!item) return showToast('⚠️ Không có dữ liệu');
+  const main = item.main_kw_quality || '';
+  const related = Array.isArray(item.related_keywords) ? item.related_keywords : [];
+  const q = [main, ...related].join(' - ');
+  const url = `https://www.bing.com/search?q=${encodeURIComponent(q)}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('✅ Đã copy Bing!');
+    markCopied(index, 'bing');
+  });
+}
+
+// Copy Google Site link
+function copyGoogleSite(index) {
+  const item = window.generatedData && window.generatedData[index];
+  if (!item || !item.site_id) return showToast('⚠️ Không có site ID');
+  const url = `https://sites.google.com/view/${item.site_id}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('✅ Đã copy Google Site link!');
+    markCopied(index, 'googlesite');
+  });
+}
+    function escapeHtml(str){
+      if(!str && str !== 0) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function escapeJs(str){
+      if(!str && str !== 0) return '';
+      return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');
+    }
+
+    function copyRelatedText(index) {
+      const item = (window.generatedData && window.generatedData[index]) || {};
+      const related = (item.related || []).join('，');
+      // Get next item's site_id (wrap to first item if this is the last one)
+      const nextIndex = (index + 1) % window.generatedData.length;
+      const nextItem = window.generatedData[nextIndex];
+      const siteUrl = SITE_BASE + (nextItem?.site_id || generateRandomId(10));
+      copyHtmlContent(related, siteUrl).then(() => markCopied(index, 'related'));
+    }
+
+    function copyContent(index) {
+      const item = (window.generatedData && window.generatedData[index]) || {};
+      const content = item.content || '';
+      // For content, attach the user-provided URL (from the form) — not the Google Site link
+      const siteUrl = item.site_url || window.providedUrl || '';
+      // remove leading scheme (http:// or https://) from the displayed text inside the content
+      const displayContent = String(content).replace(/https?:\/\//g, '');
+      copyHtmlContent(displayContent, siteUrl).then(() => markCopied(index, 'content'));
+    }
+
+    function copyBing(index, bingUrl) {
+      // copy plain bing url text and mark
+      copyText(bingUrl).then(() => markCopied(index, 'bing'));
+    }
+
+    // Build a Bing search URL from up to 5 related keywords and copy it
+    function copyBingSearch(index) {
+  const item = (window.generatedData && window.generatedData[index]) || {};
+  const related = Array.isArray(item.related) ? item.related : [];
+  const top = related.slice(0, 5);
+
+  if (top.length === 0) {
+    showToast('⚠️ No keywords available to build Bing search');
+    return;
+  }
+
+  // Ghép từ khóa bằng dấu "-"
+  const q = top.map(t => t.trim().replace(/\s+/g, '-')).join('-');
+  const url = `https://www.bing.com/search?q=${encodeURIComponent(q)}`;
+
+  copyBing(index, url);
+}
+
+// Copy package: main keyword + 【网址：domain】 + up to 5 subkeywords joined by ' - '
+function copyPackage(index) {
+  const item = (window.generatedData && window.generatedData[index]) || {};
+  // try to get related keywords from item, otherwise fall back to the textarea keywords
+  let related = Array.isArray(item.related) ? item.related.slice() : [];
+  if (!related.length) {
+    const raw = document.getElementById('keywords')?.value || '';
+    related = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+
+  const main = related[0] || '';
+
+  // domain from providedUrl or form input (no scheme)
+  const rawUrl = window.providedUrl || (document.getElementById('url')?.value || '');
+  const domain = rawUrl ? rawUrl.replace(/^https?:\/\//, '').split('/')[0] : '';
+
+  // take up to 5 subkeywords after the main one
+  const subs = related.slice(1, 6).join(' - ');
+
+  const assembled = `${main}${domain ? ' 【网址：' + domain + '】' : ''}${subs ? ' ' + subs : ''}`.trim();
+
+  if (!assembled) {
+    showToast('⚠️ Không có nội dung để sao chép');
+    return;
+  }
+
+  navigator.clipboard.writeText(assembled).then(() => {
+    showToast('✅ Pack copied!');
+    try { markCopied(index, 'package'); } catch(e) {}
+  }).catch(() => {
+    showToast('⚠️ Unable to copy pack');
+  });
+}
+
+
+    // Copy the target full URL (https://domain) from the provided form URL for a row
+    function copyFullDomain(index) {
+      const url = window.providedUrl || document.getElementById('url').value.trim() || '';
+      if (!url) {
+        showToast('⚠️ No URL to copy');
+        return;
+      }
+      const domain = url.replace(/^https?:\/\//, '').split('/')[0];
+      const full = `https://${domain}`;
+      navigator.clipboard.writeText(full).then(() => {
+        showToast('✅ Target full URL copied!');
+      }).catch(() => showToast('⚠️ Unable to copy full target URL'));
+    }
+
+    function markCopied(index, action) {
+      if (!window.copyState) window.copyState = [];
+      if (!window.copyState[index]) window.copyState[index] = new Set();
+      window.copyState[index].add(action);
+      updateRowCheckbox(index);
+    }
+
+    function updateRowCheckbox(index) {
+      const set = (window.copyState && window.copyState[index]);
+  // required actions: related, content, domain, id, bing
+  // (Complete now corresponds to copying the Bing search URL)
+  const required = ['related', 'content', 'domain', 'id', 'bing'];
+  const done = set && required.every(act => set.has(act));
+  const row = document.querySelector(`tr[data-index="${index}"]`);
+  const statusBadge = row?.querySelector('.status-badge');
+  const checkBox = row?.querySelector('.copy-check');
+  // toggle checkbox
+
+      // toggle checkbox
+      if (checkBox) checkBox.checked = !!done;
+
+      if (statusBadge) {
+        if (done) {
+          statusBadge.classList.add('completed');
+          statusBadge.innerHTML = '✨ Complete';
+          row.style.background = 'rgba(16, 185, 129, 0.05)';
+          // Add completion animation
+          row.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+          row.style.transform = 'scale(1.02)';
+          setTimeout(() => { row.style.transform = 'scale(1)'; }, 500);
+        } else {
+          statusBadge.classList.remove('completed');
+          statusBadge.innerHTML = 'Pending';
+          row.style.background = 'transparent';
+        }
+      }
+    }
+
+    function showToast(message) {
+      // Remove any existing toast
+      const existingToast = document.querySelector('.copy-toast');
+      if (existingToast) {
+        existingToast.remove();
+      }
+
+      // Create and show new toast
+      const toast = document.createElement('div');
+      toast.className = 'copy-toast';
+      toast.innerHTML = `
+        <i class="success-icon">✨</i>
+        <span>${message}</span>
+      `;
+      document.body.appendChild(toast);
+
+      // Add success effect to the button that was clicked
+      const clickedButton = document.activeElement;
+      if (clickedButton && clickedButton.classList.contains('copy')) {
+        clickedButton.classList.add('copied');
+        setTimeout(() => {
+          clickedButton.classList.remove('copied');
+        }, 1000);
+      }
+
+      // Remove toast after animation
+      setTimeout(() => {
+        toast.remove();
+      }, 2000);
+    }
+
+    function copyHtmlContent(text, url) {
+      // Create both plain text and HTML versions for the clipboard
+      const plainText = text;
+      const html = `<a href="${url}">${text}</a>`;
+
+      try {
+        // Create a clipboard item with both formats
+        const clipboardItem = new ClipboardItem({
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+          'text/html': new Blob([html], { type: 'text/html' })
+        });
+
+        return navigator.clipboard.write([clipboardItem]).then(() => {
+          showToast("✅ 已复制");
+        }).catch(() => {
+          // Fallback to basic text copy
+          return navigator.clipboard.writeText(plainText).then(() => showToast("✅ 已复制"));
+        });
+      } catch (err) {
+        // Ultimate fallback
+        return navigator.clipboard.writeText(plainText).then(() => showToast("✅ 已复制"));
+      }
+    }
+
+    function copyText(text) {
+      try {
+        return navigator.clipboard.writeText(text).then(() => {
+          showToast("✅ Copied successfully");
+        });
+      } catch (err) {
+        // try synchronous fallback
+        try { document.execCommand && document.execCommand('copy'); } catch (e) {}
+        showToast("✅ Copied successfully");
+        return Promise.resolve();
+      }
+
+      // Copy the target full URL (https://domain) from the provided form URL
+      function copyTargetUrl(index) {
+        const url = window.providedUrl || document.getElementById('url').value.trim() || '';
+        if (!url) {
+          showToast('⚠️ No URL to copy');
+          return;
+        }
+        const domain = url.replace(/^https?:\/\//, '').split('/')[0];
+        const full = `https://${domain}`;
+        navigator.clipboard.writeText(full).then(() => {
+          showToast('✅ Target URL copied!');
+          // optional: markCopied(index, 'target'); // not counted toward the 5 required actions
+        }).catch(() => showToast('⚠️ Unable to copy target URL'));
+      }
+    }
+
+    function updateUrlPreview(url) {
+      const urlNameEl = document.getElementById('urlName');
+      const urlFullEl = document.getElementById('urlFull');
+      
+      // Remove http:// or https:// for name
+      const name = url.replace(/^https?:\/\//, '').split('.')[0];
+      urlNameEl.textContent = name;
+      urlFullEl.textContent = url;
+    }
+
+    function copyUrlName(index) {
+      const url = window.providedUrl || 'http://191.run';
+      // Remove http:// or https:// and get the domain name
+      const name = url.replace(/^https?:\/\//, '').split('.')[0];
+      copyText(name).then(() => markCopied(index, 'urlname'));
+    }
+
+    function copyUrlFull(index) {
+      const url = window.providedUrl || 'http://191.run';
+      copyText(url).then(() => markCopied(index, 'urlfull'));
+    }
+  // 初始化：不需要生成全局 Site ID anymore; each row has its own site_id
+
+    // Three.js initialization
+    function initThreeJS() {
+      const container = document.getElementById('threejs-container');
+
+      // Create scene
+      const scene = new THREE.Scene();
+
+      // Create camera
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 8;
+
+      // Create renderer
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      container.appendChild(renderer.domElement);
+
+      // Create floating cubes with improved animation and material
+      const cubes = [];
+      for (let i = 0; i < 8; i++) {
+        const geometry = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+        const material = new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(`hsl(${40 + i * 40}, 80%, 60%)`),
+          metalness: 0.8,
+          roughness: 0.15,
+          clearcoat: 0.7,
+          clearcoatRoughness: 0.2,
+          reflectivity: 0.8,
+          transparent: true,
+          opacity: 0.9,
+          sheen: 0.5,
+        });
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.set(
+          (Math.random() - 0.5) * 8,
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 6
+        );
+        cube.userData = {
+          baseY: cube.position.y,
+          baseX: cube.position.x,
+          floatSpeed: 0.7 + Math.random() * 0.5,
+          rotSpeed: 0.01 + Math.random() * 0.01,
+        };
+        scene.add(cube);
+        cubes.push(cube);
+      }
+
+      // Create floating spheres with improved material
+      const spheres = [];
+      for (let i = 0; i < 10; i++) {
+        const geometry = new THREE.SphereGeometry(0.45, 32, 32);
+        const material = new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(`hsl(${220 + i * 12}, 70%, 65%)`),
+          metalness: 0.6,
+          roughness: 0.18,
+          clearcoat: 0.5,
+          clearcoatRoughness: 0.25,
+          reflectivity: 0.7,
+          transparent: true,
+          opacity: 0.8,
+          sheen: 0.4,
+        });
+        const sphere = new THREE.Mesh(geometry, material);
+        sphere.position.set(
+          (Math.random() - 0.5) * 10,
+          (Math.random() - 0.5) * 7,
+          (Math.random() - 0.5) * 8
+        );
+        sphere.userData = {
+          baseY: sphere.position.y,
+          baseX: sphere.position.x,
+          floatSpeed: 0.6 + Math.random() * 0.5,
+          rotSpeed: 0.008 + Math.random() * 0.008,
+        };
+        scene.add(sphere);
+        spheres.push(sphere);
+      }
+
+      // Add soft colored lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+  const directionalLight = new THREE.DirectionalLight(0x06b6d4, 1.2);
+      directionalLight.position.set(2, 6, 8);
+      scene.add(directionalLight);
+
+      // Mouse movement effect
+      let mouseX = 0;
+      let mouseY = 0;
+      document.addEventListener('mousemove', (event) => {
+        mouseX = event.clientX;
+        mouseY = event.clientY;
+      });
+
+      // Animation
+      // Animation with smoother floating and rotation
+      const animate = () => {
+        requestAnimationFrame(animate);
+        const time = Date.now() * 0.001;
+
+        // Animate cubes
+        cubes.forEach((cube, i) => {
+          cube.rotation.x += cube.userData.rotSpeed;
+          cube.rotation.y += cube.userData.rotSpeed * 1.2;
+          cube.position.y = cube.userData.baseY + Math.sin(time * cube.userData.floatSpeed + i) * 0.5;
+          cube.position.x = cube.userData.baseX + Math.cos(time * cube.userData.floatSpeed + i) * 0.3;
+        });
+        // Animate spheres
+        spheres.forEach((sphere, i) => {
+          sphere.rotation.y += sphere.userData.rotSpeed;
+          sphere.position.y = sphere.userData.baseY + Math.cos(time * sphere.userData.floatSpeed + i * 2) * 0.4;
+          sphere.position.x = sphere.userData.baseX + Math.sin(time * sphere.userData.floatSpeed + i * 2) * 0.25;
+        });
+          // Camera subtle movement (also respond to backgroundInteraction via window.bgMouse when available)
+          const bg = (window.bgMouse) ? window.bgMouse : { x: 0, y: 0 };
+          // smoothing toward target values for gentle motion
+          const targetCamX = bg.x * 0.6; // small influence
+          const targetCamY = -bg.y * 0.4;
+          camera.position.x += (targetCamX - camera.position.x) * 0.05;
+          camera.position.y += (targetCamY - camera.position.y) * 0.05;
+          // also nudge the directional light for extra depth
+          if (directionalLight) {
+            const targetLx = bg.x * 2;
+            const targetLy = -bg.y * 1.5;
+            directionalLight.position.x += (targetLx - directionalLight.position.x) * 0.03;
+            directionalLight.position.y += (targetLy - directionalLight.position.y) * 0.03;
+          }
+        camera.lookAt(scene.position);
+        renderer.render(scene, camera);
+      };
+
+      // Handle resize
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Start animation
+      animate();
+    }
+    // Initialize Three.js and container effects when the page loads
+    window.addEventListener('load', () => {
+      try { initThreeJS(); } catch(e) { console.error(e); }
+      try { initContainerEffects(); } catch(e) { /* non-fatal */ }
+    });
+
+    // Remove the 3D mouse movement effect to reduce dizziness
+    const container = document.querySelector('.container');
+    document.removeEventListener('mousemove', (event) => {
+      const { clientX, clientY } = event;
+      const { innerWidth, innerHeight } = window;
+
+      const xRotation = ((clientY / innerHeight) - 0.5) * 15;
+      const yRotation = ((clientX / innerWidth) - 0.5) * 15;
+
+      container.style.transform = `perspective(1000px) rotateX(${xRotation}deg) rotateY(${yRotation}deg)`;
+    });
+
+    document.removeEventListener('mouseleave', () => {
+      container.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
+    });
+
+    /* Container-local visual effects: subtle orbs and interactive motion */
+    function initContainerEffects(){
+      const containerInner = document.querySelector('.container-inner');
+      const canvas = document.getElementById('container-canvas');
+      if (!containerInner || !canvas) return;
+      // respect reduced-motion
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        canvas.style.display = 'none';
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
+      let w = canvas.width = Math.max(300, Math.round(containerInner.clientWidth));
+      let h = canvas.height = Math.max(200, Math.round(containerInner.clientHeight));
+      const DPR = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(w * DPR);
+      canvas.height = Math.round(h * DPR);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.scale(DPR, DPR);
+
+      // particles local to container
+      const particles = [];
+      const count = Math.max(8, Math.round((w * h) / 40000));
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: 1 + Math.random() * 3,
+          vx: (Math.random() - 0.5) * 0.2,
+          vy: (Math.random() - 0.5) * 0.2,
+          alpha: 0.08 + Math.random() * 0.28,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      // local mouse influence (relative to container)
+      const local = { x: w/2, y: h/2, influence: 0 };
+
+      function onMove(e){
+        const r = containerInner.getBoundingClientRect();
+        const mx = e.clientX - r.left;
+        const my = e.clientY - r.top;
+        local.x = mx; local.y = my; local.influence = 1;
+      }
+      function onLeave(){ local.influence = 0; }
+      containerInner.addEventListener('mousemove', onMove, { passive: true });
+      containerInner.addEventListener('mouseleave', onLeave, { passive: true });
+
+      function onResize(){
+        w = Math.round(containerInner.clientWidth);
+        h = Math.round(containerInner.clientHeight);
+        canvas.width = Math.round(w * DPR);
+        canvas.height = Math.round(h * DPR);
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      }
+      window.addEventListener('resize', onResize);
+
+      let last = performance.now();
+      function frame(now){
+        const dt = Math.min(40, now - last); last = now;
+        ctx.clearRect(0,0,w,h);
+
+        // subtle background wash that moves with window.bgMouse
+        const bgx = (window.bgMouse?.x || 0) * 0.5 * w + w/2;
+        const bgy = (window.bgMouse?.y || 0) * 0.4 * h + h/2;
+  const g = ctx.createRadialGradient(bgx, bgy, 0, bgx, bgy, Math.max(w,h) * 0.8);
+  g.addColorStop(0, 'rgba(6,182,212,0.035)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+
+        // animate particles
+        for (let p of particles){
+          // gentle bobbing
+          p.phase += 0.01 * (1 + Math.sin(now/1000));
+          p.x += p.vx + Math.sin(p.phase) * 0.02;
+          p.y += p.vy + Math.cos(p.phase) * 0.02;
+
+          // respond to local mouse influence (small pull)
+          const dx = local.x - p.x; const dy = local.y - p.y;
+          p.x += dx * 0.0006 * (local.influence ? 6 : 1);
+          p.y += dy * 0.0004 * (local.influence ? 6 : 1);
+
+          // wrap
+          if (p.x < -20) p.x = w + 20; if (p.x > w + 20) p.x = -20;
+          if (p.y < -20) p.y = h + 20; if (p.y > h + 20) p.y = -20;
+
+          // draw soft orb
+          const rad = p.r * (1 + 0.3 * Math.sin(p.phase));
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad * 6);
+          grad.addColorStop(0, `rgba(255,255,255,${(p.alpha * 0.6).toFixed(3)})`);
+          grad.addColorStop(0.2, `rgba(6,182,212,${(p.alpha * 0.18).toFixed(3)})`);
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath(); ctx.arc(p.x, p.y, rad * 4, 0, Math.PI*2); ctx.fill();
+        }
+
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    /* ---------- Background interaction: cursor-follow glow + threejs parallax + particles ---------- */
+    (function backgroundInteraction(){
+      const root = document.documentElement;
+      const three = document.getElementById('threejs-container');
+      const canvas = document.getElementById('bg-particles');
+
+      // expose a compact normalized mouse state for other code
+      window.bgMouse = { x: 0, y: 0 };
+      // queue used to request short-lived comet bursts from click handlers
+      window._clickCometQueue = [];
+      // helper to request a burst of click-comets (x,y in client coords)
+      window.spawnClickComets = function(x, y, opts = {}){
+        // push a lightweight descriptor; initParticles will consume and spawn visuals
+        try { window._clickCometQueue.push({ x: x || window.innerWidth/2, y: y || window.innerHeight/2, opts }); } catch(e) {}
+      };
+
+      // update CSS vars and parallax transform on mouse move
+      window.addEventListener('mousemove', (e) => {
+        const xPct = (e.clientX / window.innerWidth) * 100;
+        const yPct = (e.clientY / window.innerHeight) * 100;
+        root.style.setProperty('--mx', xPct + '%');
+        root.style.setProperty('--my', yPct + '%');
+
+        // normalized -1..1 for JS usage
+        window.bgMouse.x = (xPct - 50) / 50;
+        window.bgMouse.y = (yPct - 50) / 50;
+
+        // subtle parallax: move the threejs container a few pixels based on cursor
+        // increase influence for a more dynamic background motion
+        const tx = (xPct - 50) * 0.12; // horizontal shift
+        const ty = (yPct - 50) * 0.08; // vertical shift
+        if (three) three.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+      }, { passive: true });
+
+      // also respond to touch moves for mobile
+      window.addEventListener('touchmove', (ev) => {
+        const t = ev.touches && ev.touches[0];
+        if (!t) return;
+        const xPct = (t.clientX / window.innerWidth) * 100;
+        const yPct = (t.clientY / window.innerHeight) * 100;
+        root.style.setProperty('--mx', xPct + '%');
+        root.style.setProperty('--my', yPct + '%');
+        window.bgMouse.x = (xPct - 50) / 50;
+        window.bgMouse.y = (yPct - 50) / 50;
+        const tx = (xPct - 50) * 0.04;
+        const ty = (yPct - 50) * 0.03;
+        if (three) three.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+      }, { passive: true });
+
+      // click pulse: small transient radial flash where user clicked
+      window.addEventListener('click', (e) => {
+        const pulse = document.createElement('div');
+        pulse.style.position = 'fixed';
+        pulse.style.left = e.clientX + 'px';
+        pulse.style.top = e.clientY + 'px';
+        pulse.style.width = '220px';
+        pulse.style.height = '220px';
+        pulse.style.borderRadius = '50%';
+        pulse.style.pointerEvents = 'none';
+        pulse.style.transform = 'translate(-50%, -50%) scale(0.2)';
+        pulse.style.background = 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 60%)';
+        pulse.style.zIndex = 9999;
+        pulse.style.transition = 'transform 650ms cubic-bezier(0.2,0.8,0.2,1), opacity 650ms ease-out';
+        document.body.appendChild(pulse);
+        requestAnimationFrame(() => {
+          pulse.style.transform = 'translate(-50%, -50%) scale(1)';
+          pulse.style.opacity = '0';
+        });
+        setTimeout(() => pulse.remove(), 700);
+
+        // also spawn a quick burst of fast comets on the canvas for a click effect
+        try { if (typeof spawnClickComets === 'function') spawnClickComets(e.clientX, e.clientY); } catch (err) { /* ignore */ }
+      }, { passive: true });
+
+      // Lightweight particle layer (canvas-based) — simple moving orbs and twinkles
+      function initParticles() {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let w = canvas.width = window.innerWidth;
+        let h = canvas.height = window.innerHeight;
+        const DPR = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.round(w * DPR);
+        canvas.height = Math.round(h * DPR);
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.scale(DPR, DPR);
+
+        const particles = [];
+        // increase density slightly for a richer background; scale to viewport
+        const baseCount = Math.round((w * h) / 60000);
+        const count = Math.max(12, baseCount);
+        for (let i = 0; i < count; i++) {
+          particles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            r: 0.8 + Math.random() * 3.2,
+            vx: (Math.random() - 0.5) * 0.28,
+            vy: -0.04 - Math.random() * 0.36,
+            alpha: 0.18 + Math.random() * 0.62,
+            twinkle: Math.random() * 2000
+          });
+        }
+
+        // comet/trail layer for streaks and click bursts
+        const comets = [];
+
+        // spawn a few persistent slow comets for subtle streaks
+        (function spawnAmbientComets(){
+          const ambient = Math.max(2, Math.round(Math.sqrt(w * h) / 600));
+          for (let i = 0; i < ambient; i++) {
+            comets.push({
+              x: Math.random() * w,
+              y: Math.random() * h,
+              vx: (Math.random() - 0.5) * 1.2,
+              vy: -0.3 - Math.random() * 0.6,
+              len: 6 + Math.random() * 28,
+              alpha: 0.08 + Math.random() * 0.22,
+              life: Infinity
+            });
+          }
+        })();
+
+        function onResize() {
+          w = canvas.width = window.innerWidth * DPR;
+          h = canvas.height = window.innerHeight * DPR;
+          canvas.width = Math.round(window.innerWidth * DPR);
+          canvas.height = Math.round(window.innerHeight * DPR);
+          canvas.style.width = window.innerWidth + 'px';
+          canvas.style.height = window.innerHeight + 'px';
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+
+        window.addEventListener('resize', onResize);
+
+        let last = performance.now();
+        function frame(now) {
+          const dt = Math.min(40, now - last);
+          last = now;
+          ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+          // draw soft radial glows
+          for (let p of particles) {
+            p.x += p.vx * (dt * 0.08) + (window.bgMouse.x || 0) * 1.2;
+            p.y += p.vy * (dt * 0.08) + (window.bgMouse.y || 0) * 0.6;
+            if (p.y < -80) p.y = window.innerHeight + 40;
+            if (p.x < -80) p.x = window.innerWidth + 40;
+            if (p.x > window.innerWidth + 80) p.x = -40;
+
+            // twinkle
+            const tw = (Math.sin((now + p.twinkle) / 300) + 1) / 2;
+            const alpha = p.alpha * (0.5 + 0.5 * tw);
+
+            const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 10);
+            grad.addColorStop(0, `rgba(255,255,255,${alpha * 0.28})`);
+            grad.addColorStop(0.2, `rgba(6,182,212,${alpha * 0.16})`);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, rad * 9, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // consume click-comet requests and spawn short-lived comets
+          while (window._clickCometQueue && window._clickCometQueue.length) {
+            const q = window._clickCometQueue.shift();
+            const burst = 8 + Math.round(Math.random() * 10);
+            for (let i = 0; i < burst; i++) {
+              comets.push({
+                x: q.x + (Math.random() - 0.5) * 40,
+                y: q.y + (Math.random() - 0.5) * 40,
+                vx: ((Math.random() - 0.5) * 6) + (Math.random() * 2 - 1),
+                vy: -1 - Math.random() * 4,
+                len: 6 + Math.random() * 26,
+                alpha: 0.3 + Math.random() * 0.6,
+                life: 800 + Math.random() * 600
+              });
+            }
+          }
+
+          // draw comets (streaks)
+          for (let i = comets.length - 1; i >= 0; i--) {
+            const c = comets[i];
+            // delta move
+            c.x += c.vx * (dt * 0.06);
+            c.y += c.vy * (dt * 0.06);
+            if (c.life !== Infinity) c.life -= dt;
+            // remove if life expired or off-screen far
+            if ((c.life !== Infinity && c.life <= 0) || c.y < -200 || c.x < -200 || c.x > window.innerWidth + 200) {
+              comets.splice(i, 1);
+              continue;
+            }
+
+            // draw as directional gradient / streak
+            const grad = ctx.createLinearGradient(c.x - c.vx * 6, c.y - c.vy * 6, c.x + c.vx * 6, c.y + c.vy * 6);
+            grad.addColorStop(0, `rgba(255,255,255,${Math.max(0, c.alpha * 0.0)})`);
+            grad.addColorStop(0.4, `rgba(255,255,255,${(c.alpha * 0.6).toFixed(3)})`);
+            grad.addColorStop(1, `rgba(6,182,212,${(c.alpha * 0.18).toFixed(3)})`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            // ellipse rotated along velocity vector
+            const angle = Math.atan2(c.vy, c.vx);
+            ctx.save();
+            ctx.translate(c.x, c.y);
+            ctx.rotate(angle);
+            ctx.ellipse(0, 0, c.len, Math.max(1, c.len * 0.25), 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      }
+
+      // init particles (non-blocking) unless the user prefers reduced motion
+      if (!window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        setTimeout(initParticles, 300);
+      }
+    })();
+  </script>
+</body>
+</html>
+
